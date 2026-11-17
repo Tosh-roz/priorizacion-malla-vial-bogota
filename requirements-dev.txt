@@ -1,0 +1,10 @@
+# Solo para desarrollo: notebook, reentrenamiento con descarga de datos y preparación del geovisor.
+-r requirements.txt
+matplotlib>=3.7
+seaborn>=0.13
+requests>=2.31
+nbformat>=5.9
+nbconvert>=7.0
+jupyter>=1.0
+openpyxl>=3.1
+shapely>=2.0   # python -m src.geo_prep (geometría de tramos, barrios y localidades)

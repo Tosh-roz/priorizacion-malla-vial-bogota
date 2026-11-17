@@ -1,0 +1,11 @@
+[theme]
+# Tema claro fijo: el CSS de la app usa fondo claro; con el tema oscuro del sistema el texto desaparecía.
+base = "light"
+primaryColor = "#E09F00"
+backgroundColor = "#F7F4EF"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#0E1A2B"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false

@@ -1,0 +1,14 @@
+{
+  "accuracy": 0.9012089012089012,
+  "precision": 0.5846759756534192,
+  "recall": 0.9299544419134397,
+  "f1": 0.7179599912068586,
+  "roc_auc": 0.9686623361266784,
+  "report": "              precision    recall  f1-score   support\n\n           0       0.99      0.90      0.94     11231\n           1       0.58      0.93      0.72      1756\n\n    accuracy                           0.90     12987\n   macro avg       0.79      0.91      0.83     12987\nweighted avg       0.93      0.90      0.91     12987\n",
+  "baseline_majority_f1": 0.0,
+  "n_train": 60606,
+  "n_val": 12987,
+  "n_test": 12987,
+  "positive_rate": 0.1352159852159852,
+  "val_f1": 0.7322064056939501
+}

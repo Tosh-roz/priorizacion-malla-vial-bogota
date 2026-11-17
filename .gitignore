@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+# Insumos pesados que la app no necesita para ejecutarse
+_tmp_datos/
+data/itagui/

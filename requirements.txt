@@ -1,0 +1,7 @@
+# Dependencias para EJECUTAR la app (y para desplegarla en Streamlit Community Cloud / Hugging Face Spaces).
+streamlit>=1.50
+pandas>=2.2
+numpy>=1.26
+scikit-learn==1.9.1   # misma versión con la que se verificó el modelo (models/pipeline_priorizacion.joblib)
+joblib>=1.3
+altair>=5.0
