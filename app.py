@@ -481,7 +481,11 @@ inicial = {v: k for k, v in LOCALIDADES.items()}.get(loc_sel)
 if web_ok:
     # Versión ligera: sitio estático (datos comprimidos por localidad, carga progresiva).
     src = f"{GEOVISOR_URL}/?embed=1" + (f"&loc={inicial}" if inicial else "")
-    components.iframe(src, height=760)
+    components.html(
+        '<style>html,body{margin:0;height:100%;overflow:hidden}</style>'
+        f'<iframe src="{src}" title="Geovisor de la malla vial" style="width:100%;height:100%;border:0;border-radius:12px" allow="fullscreen"></iframe>',
+        height=770,
+    )
     st.caption(f"[Abrir el geovisor en pantalla completa]({GEOVISOR_URL}/)")
 elif not hay_geo:
     st.info("Falta la geometría de los tramos. Ejecuta `python -m src.geo_prep` (requiere internet) y recarga.")
