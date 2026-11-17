@@ -101,7 +101,8 @@ function styleOf(r){const m=modo();
  if(m=="estado")return r[4]<0?["#888888",0]:[EST_COL[r[4]],r[4]];
  if(m=="riesgo"){const q=rk(r[2]);return[RIE[q][1],q]}
  return[TIPO_COL[r[5]%TIPO_COL.length],0]}
-function pass(r){return r[1]>=+$("min").value&&r[2]>=+$("rie").value/100&&st.capas[prio(r[1])]&&(r[4]<0||st.est[r[4]])&&st.tipo[r[5]]}
+let fMin=0,fRie=0;
+function pass(r){return r[1]>=fMin&&r[2]>=fRie&&st.capas[prio(r[1])]&&(r[4]<0||st.est[r[4]])&&st.tipo[r[5]]}
 // ---- decodificación: anillos con deltas enteros (1e-5°) -> mercator normalizado ----
 function decodificar(rings){return rings.map(a=>{const n=a.length/2,o=new Float64Array(n*2);let x=0,y=0;
  for(let k=0;k<n;k++){x+=a[2*k];y+=a[2*k+1];o[2*k]=mx(x/1e5);o[2*k+1]=my(y/1e5)}return o})}
@@ -111,7 +112,7 @@ function agregarFilas(loc,filas){
   byCiv.set(String(f[0]),R.length);
   R.push([f[0],f[1],f[2],f[3],f[4],f[5],loc,f[6],null,f[7]]);G.push({rings,bb:[x0,y0,x1,y1]})}}
 // ---- capa de tramos (lienzo propio) ----
-const PAD=.5;
+const PAD=.25;
 const Segs=L.Layer.extend({
  onAdd(m){this._c=L.DomUtil.create("canvas");this._c.style.position="absolute";m.getPane("segs").appendChild(this._c);m.on("moveend resize",this._reset,this);this._reset()},
  onRemove(m){L.DomUtil.remove(this._c);m.off("moveend resize",this._reset,this)},
@@ -120,9 +121,11 @@ const Segs=L.Layer.extend({
  draw(){const m=this._map,c=this._c,x=c.getContext("2d");x.clearRect(0,0,c.width,c.height);
   const z=m.getZoom(),sc=256*Math.pow(2,z),pb=m.getPixelBounds().min,ox=pb.x+this._off.x,oy=pb.y+this._off.y;
   const vx0=ox/sc,vy0=oy/sc,vx1=(ox+c.width)/sc,vy1=(oy+c.height)/sc;
-  x.lineJoin="round";x.lineWidth=weight;
+  x.lineJoin="round";x.lineCap="round";x.lineWidth=weight;
   for(const g of groups){x.fillStyle=g.c;x.strokeStyle=g.c;x.globalAlpha=.92;x.beginPath();
    for(const i of g.idx){const b=G[i].bb;if(b[2]<vx0||b[0]>vx1||b[3]<vy0||b[1]>vy1)continue;
+    const pw=(b[2]-b[0])*sc+(b[3]-b[1])*sc;
+    if(pw<10){const a=G[i].rings[0],m=(a.length>>2)*2;x.moveTo(a[0]*sc-ox,a[1]*sc-oy);x.lineTo(a[m]*sc-ox,a[m+1]*sc-oy);continue}
     for(const a of G[i].rings){x.moveTo(a[0]*sc-ox,a[1]*sc-oy);for(let k=2;k<a.length;k+=2)x.lineTo(a[k]*sc-ox,a[k+1]*sc-oy);x.closePath()}}
    x.fill();x.stroke()}}
 });
@@ -162,7 +165,7 @@ function setSel(loc,bar,fit=true){
  if(fit){if(loc==null)map.setView(CENTRO,11);else fitSel()}
  refresh()}
 function refresh(){
- vis=scope.filter(i=>pass(R[i]));buildGroups();segs.draw();
+ fMin=+$("min").value;fRie=+$("rie").value/100;vis=scope.filter(i=>pass(R[i]));buildGroups();segs.draw();
  const cnt=[0,0,0,0];let rs=0,ss=0;
  vis.forEach(i=>{const r=R[i];cnt[prio(r[1])]++;rs+=r[2];ss+=r[1]});const n=vis.length;
  const cAll=[0,0,0,0];scope.forEach(i=>cAll[prio(R[i][1])]++);
@@ -188,7 +191,7 @@ function aplicarBase(){const v=document.querySelector("[name=bm]:checked").value
  Object.entries(base).forEach(([k,l])=>{if(k==v){if(!map.hasLayer(l))map.addLayer(l);l.setOpacity(o)}else if(map.hasLayer(l))map.removeLayer(l)});
  $("op").disabled=v=="none"}
 // ---- arranque: metadatos, mapa y descarga progresiva por localidad ----
-let pend=null;function programar(){if(pend)return;pend=setTimeout(()=>{pend=null;setSel(cur.loc,cur.bar,false)},250)}
+let pend=null,ultimo=0;function programar(){if(pend)return;const esp=Math.max(0,1500-(Date.now()-ultimo));pend=setTimeout(()=>{pend=null;ultimo=Date.now();setSel(cur.loc,cur.bar,false)},esp)}
 async function cargarDatos(){
  const inicial=qs.get("loc")?+qs.get("loc"):null;
  const orden=[...D.archivos].sort((a,b)=>(a==inicial?-1:b==inicial?1:a-b));
