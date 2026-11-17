@@ -20,3 +20,8 @@ La app necesita internet solo para el mapa base del geovisor (OpenStreetMap / Es
 - `app.py`: interfaz. `src/`: datos, features, modelo, evaluación y geovisor. `geovisor/plantilla.html`: mapa.
 - `models/`: modelo entrenado. `data/`: tablas puntuadas y geometría (`data/geo/`).
 - `requirements-dev.txt`: notebook, reentrenamiento y preparación de geometría (`python -m src.geo_prep`).
+
+## Geovisor web (Vercel)
+`geovisor_web/` es un sitio estático (sin servidor): `index.html` + `data/` por localidad en formato compacto.
+Regenerar datos: `python build_geovisor_web.py`. En Vercel: importar este repositorio con **Root Directory = `geovisor_web`**,
+Framework **Other**, sin comando de build. Parámetros: `?loc=8` abre una localidad; `?embed=1` oculta la cabecera (para `iframe`).

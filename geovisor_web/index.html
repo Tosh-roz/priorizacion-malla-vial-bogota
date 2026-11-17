@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Geovisor · Priorización de la malla vial de Bogotá</title>
+<meta name="description" content="Mapa interactivo de la priorización de la malla vial de Bogotá por localidad y barrio (AHP + Random Forest). Proyecto académico.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+:root{--ink:#14202f;--muted:#6b7a8d;--line:#e6eaf0;--bg:#f4f6f9;--amber:#f5b800}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{font-family:Inter,Segoe UI,system-ui,sans-serif;color:var(--ink);background:var(--bg);overflow:hidden}
+header{position:absolute;inset:0 0 auto 0;height:56px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 18px;z-index:1002}
+header small{display:block;font-size:10px;letter-spacing:.08em;color:var(--muted);font-weight:600}
+header h1{margin:1px 0 0;font-size:15px;font-weight:700}
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 11px;font:600 12px Inter,sans-serif;cursor:pointer;color:var(--ink)}
+#map{position:absolute;inset:56px 0 0 0;z-index:1;background:#eef1f5}
+#panel{position:absolute;left:10px;top:66px;bottom:10px;width:292px;background:#fff;border-radius:12px;box-shadow:0 4px 18px rgba(20,32,47,.18);padding:14px 12px;overflow:auto;z-index:1000}
+.embed header{display:none}.embed #map{inset:0}.embed #panel{top:10px}
+#panel h2{margin:0;font-size:16px}#panel .sub{font-size:12px;color:var(--muted);margin:2px 0 10px}
+input[type=text],select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:13px Inter,sans-serif;background:#fff;color:var(--ink);margin-top:2px}
+.lbl{font-size:11px;font-weight:600;color:var(--muted);margin-top:8px;display:block}
+.sec{border:1px solid var(--line);border-radius:10px;margin-top:10px;overflow:hidden}
+.sec>summary{list-style:none;cursor:pointer;display:flex;gap:10px;align-items:center;padding:10px;font-weight:600;font-size:13px}
+.sec>summary::-webkit-details-marker{display:none}.sec[open]>summary{background:#fff7da}
+.ico{width:28px;height:28px;border-radius:7px;color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
+.t small{display:block;font-weight:400;color:var(--muted);font-size:11px}
+.body{padding:6px 12px 12px}
+.sub2{font-size:10px;letter-spacing:.08em;color:var(--muted);font-weight:700;margin:10px 0 4px;border-top:1px solid var(--line);padding-top:8px}
+.sub2:first-child{border:0;padding-top:0;margin-top:2px}
+.chk{display:flex;gap:8px;align-items:center;font-size:13px;margin:5px 0}.chk input{accent-color:var(--amber)}
+.sw{width:14px;height:14px;border-radius:4px;display:inline-block;flex:none}.cnt{color:var(--muted);font-size:11px;margin-left:auto}
+.rng{margin:8px 0}.rng label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}.rng input{width:100%;accent-color:var(--amber)}
+#stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.kpi{background:var(--bg);border-radius:8px;padding:8px}.kpi b{display:block;font-size:17px}.kpi span{font-size:10.5px;color:var(--muted)}
+.top{font-size:12.5px;display:flex;gap:8px;align-items:center;padding:6px 4px;border-radius:6px;cursor:pointer}.top:hover{background:var(--bg)}
+.top .rk{width:18px;color:var(--muted)}.top b{margin-left:auto}
+.foot{font-size:10.5px;color:var(--muted);margin-top:12px;line-height:1.45}
+.leaflet-popup-content{font:12.5px Inter,sans-serif;margin:12px 14px}.leaflet-popup-content-wrapper{border-radius:10px}
+.pop h4{margin:0 0 6px;font-size:14px}.pop div{display:flex;justify-content:space-between;gap:14px;padding:2px 0}.pop span{color:var(--muted)}
+.badge{display:inline-block;padding:1px 8px;border-radius:99px;color:#fff;font-weight:600;font-size:11px;font-style:normal}
+#msg{position:absolute;left:320px;top:72px;z-index:1001;background:#14202f;color:#fff;border-radius:10px;padding:10px 14px;font-size:13px;max-width:360px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+#bar-carga{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:8px}#bar-carga i{display:block;height:100%;width:0;background:var(--amber);transition:width .2s}
+.leaflet-segs-pane{pointer-events:none}
+@media(max-width:760px){#panel{width:calc(100% - 20px);bottom:auto;max-height:46vh}#msg{left:12px;top:auto;bottom:12px}}
+</style></head><body>
+<header><div><small>GEODATA DE BOGOTÁ</small><h1>Priorización de la malla vial · score AHP + Random Forest</h1></div>
+ <div><button class="btn" id="reset">Vista completa</button></div></header>
+<div id="panel">
+ <h2>Malla vial de Bogotá</h2><div class="sub">Se muestra toda la ciudad. Toca una localidad en el mapa (o elígela) y luego, si quieres, un barrio. Para ver la ficha de un tramo, elige un barrio o acerca el mapa.</div>
+ <div id="estado-carga" class="foot" style="margin:0">Cargando datos…</div><div id="bar-carga"><i id="bar-i"></i></div>
+ <span class="lbl">Localidad</span><select id="loc"><option value="">Toda la ciudad</option></select>
+ <span class="lbl">Barrio (sector catastral)</span><select id="bar" disabled><option value="">Toda la localidad</option></select>
+ <input type="text" id="civ" placeholder="Buscar tramo por CIV (ej. 8010885)" style="margin-top:10px">
+ <div id="stats"></div>
+
+ <details class="sec" open><summary><span class="ico" style="background:#d7263d">P</span><span class="t">Prioridad de intervención<small>Score final: 70 % reglas + 30 % riesgo ML</small></span></summary><div class="body">
+  <div class="sub2">COLOREAR POR</div>
+  <select id="modo"><option value="prio">Prioridad (score final)</option><option value="estado">Estado AASHTO actual</option><option value="riesgo">Riesgo de empeorar</option><option value="tipo">Tipo de vía</option></select>
+  <div class="sub2">CAPAS DE PRIORIDAD</div><div id="capas"></div><div id="legend"></div></div></details>
+
+ <details class="sec"><summary><span class="ico" style="background:#14202f">M</span><span class="t">Mapa base y visibilidad<small>Transparencia y grosor de tramos</small></span></summary><div class="body">
+  <div class="chk"><label><input type="radio" name="bm" value="osm" checked> OpenStreetMap</label></div>
+  <div class="chk"><label><input type="radio" name="bm" value="esri"> Satélite (Esri)</label></div>
+  <div class="chk"><label><input type="radio" name="bm" value="none"> Sin mapa base (fondo liso)</label></div>
+  <div class="rng"><label>Transparencia del mapa base <b id="opv">0 %</b></label><input type="range" id="op" min="0" max="90" step="5" value="0"></div>
+  <div class="rng"><label>Grosor de los tramos <b id="wv">2 px</b></label><input type="range" id="w" min="1" max="10" step="1" value="2"></div>
+  <div class="chk"><label><input type="checkbox" id="blim" checked> Límites de barrios (al elegir localidad)</label></div></div></details>
+
+ <details class="sec"><summary><span class="ico" style="background:#1f78b4">F</span><span class="t">Filtros<small>Puntaje, riesgo, estado y tipo</small></span></summary><div class="body">
+  <div class="rng"><label>Puntaje mínimo <b id="minv">0</b></label><input type="range" id="min" min="0" max="90" value="0"></div>
+  <div class="rng"><label>Riesgo de empeorar mínimo <b id="riev">0 %</b></label><input type="range" id="rie" min="0" max="100" step="5" value="0"></div>
+  <div class="sub2">ESTADO AASHTO</div><div id="fest"></div>
+  <div class="sub2">TIPO DE VÍA</div><div id="ftipo"></div></div></details>
+
+ <details class="sec"><summary><span class="ico" style="background:#f5b800;color:#14202f">T</span><span class="t">Top de tramos urgentes<small>Los 10 de mayor puntaje en la selección</small></span></summary><div class="body" id="toplist"></div></details>
+
+ <div class="foot">Fuentes: IDU, estado de la malla vial (corte dic-2024). Barrios y localidades: Catastro Bogotá (sector catastral). Mapa base: OpenStreetMap / Esri. Puntaje ≥65 urgente · 50–65 alta · 35–50 media · &lt;35 baja. El flujo es un proxy por jerarquía; el riesgo viene del Random Forest y es una estimación, no una certeza. Proyecto académico, Universidad de los Andes; no reemplaza la decisión oficial de IDU/UAERMV.</div>
+</div>
+<div id="msg" style="display:none"></div><div id="map"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+const $=id=>document.getElementById(id), nf=n=>n.toLocaleString("es-CO");
+const qs=new URLSearchParams(location.search);
+if(qs.get("embed")==="1")document.body.classList.add("embed");
+const PRIO=[["Urgente","#d7263d"],["Alta","#f28c28"],["Media","#f4d35e"],["Baja","#2e9e6b"]];
+const prio=s=>s>=65?0:s>=50?1:s>=35?2:3;
+const EST_COL=["#1a9850","#66bd63","#d9ef8b","#fdae61","#f46d43","#d73027","#7f0000"];
+const TIPO_COL=["#6a3d9a","#1f78b4","#33a02c","#ff7f00","#b15928","#999999","#e31a1c","#a6cee3"];
+const RIE=[["< 20 %","#2e9e6b"],["20–40 %","#f4d35e"],["40–60 %","#f28c28"],["≥ 60 %","#d7263d"]];
+const rk=p=>p<.2?0:p<.4?1:p<.6?2:3;
+const ll=rs=>rs.map(r=>r.map(q=>[q[1],q[0]]));
+const bnds=rs=>{const b=L.latLngBounds([]);rs.forEach(r=>r.forEach(q=>b.extend([q[1],q[0]])));return b};
+const CENTRO=[4.65,-74.1];
+const mx=lng=>(lng+180)/360, my=lat=>0.5-Math.log(Math.tan(Math.PI/4+lat*Math.PI/360))/(2*Math.PI);
+const ux=x=>x*360-180, uy=y=>Math.atan(Math.sinh(Math.PI*(1-2*y)))*180/Math.PI;
+let D=null, R=[], G=[], byCiv=new Map(), cur={loc:null,bar:null}, scope=[], vis=[], groups=[], weight=2, ready=false;
+let map, segs, locG, barG, hlG, cvLoc, base, locLayers={};
+const st={capas:[1,1,1,1],est:[],tipo:[]};
+const modo=()=>$("modo").value;
+function styleOf(r){const m=modo();
+ if(m=="prio"){const k=prio(r[1]);return[PRIO[k][1],3-k]}
+ if(m=="estado")return r[4]<0?["#888888",0]:[EST_COL[r[4]],r[4]];
+ if(m=="riesgo"){const q=rk(r[2]);return[RIE[q][1],q]}
+ return[TIPO_COL[r[5]%TIPO_COL.length],0]}
+function pass(r){return r[1]>=+$("min").value&&r[2]>=+$("rie").value/100&&st.capas[prio(r[1])]&&(r[4]<0||st.est[r[4]])&&st.tipo[r[5]]}
+// ---- decodificación: anillos con deltas enteros (1e-5°) -> mercator normalizado ----
+function decodificar(rings){return rings.map(a=>{const n=a.length/2,o=new Float64Array(n*2);let x=0,y=0;
+ for(let k=0;k<n;k++){x+=a[2*k];y+=a[2*k+1];o[2*k]=mx(x/1e5);o[2*k+1]=my(y/1e5)}return o})}
+function agregarFilas(loc,filas){
+ for(const f of filas){const rings=decodificar(f[8]);let x0=1,y0=1,x1=0,y1=0;
+  for(const a of rings)for(let i=0;i<a.length;i+=2){const X=a[i],Y=a[i+1];if(X<x0)x0=X;if(X>x1)x1=X;if(Y<y0)y0=Y;if(Y>y1)y1=Y}
+  byCiv.set(String(f[0]),R.length);
+  R.push([f[0],f[1],f[2],f[3],f[4],f[5],loc,f[6],null,f[7]]);G.push({rings,bb:[x0,y0,x1,y1]})}}
+// ---- capa de tramos (lienzo propio) ----
+const PAD=.5;
+const Segs=L.Layer.extend({
+ onAdd(m){this._c=L.DomUtil.create("canvas");this._c.style.position="absolute";m.getPane("segs").appendChild(this._c);m.on("moveend resize",this._reset,this);this._reset()},
+ onRemove(m){L.DomUtil.remove(this._c);m.off("moveend resize",this._reset,this)},
+ _reset(){const m=this._map,s=m.getSize();this._c.width=Math.round(s.x*(1+2*PAD));this._c.height=Math.round(s.y*(1+2*PAD));
+  this._off=L.point(-s.x*PAD,-s.y*PAD);L.DomUtil.setPosition(this._c,m.containerPointToLayerPoint(this._off));this.draw()},
+ draw(){const m=this._map,c=this._c,x=c.getContext("2d");x.clearRect(0,0,c.width,c.height);
+  const z=m.getZoom(),sc=256*Math.pow(2,z),pb=m.getPixelBounds().min,ox=pb.x+this._off.x,oy=pb.y+this._off.y;
+  const vx0=ox/sc,vy0=oy/sc,vx1=(ox+c.width)/sc,vy1=(oy+c.height)/sc;
+  x.lineJoin="round";x.lineWidth=weight;
+  for(const g of groups){x.fillStyle=g.c;x.strokeStyle=g.c;x.globalAlpha=.92;x.beginPath();
+   for(const i of g.idx){const b=G[i].bb;if(b[2]<vx0||b[0]>vx1||b[3]<vy0||b[1]>vy1)continue;
+    for(const a of G[i].rings){x.moveTo(a[0]*sc-ox,a[1]*sc-oy);for(let k=2;k<a.length;k+=2)x.lineTo(a[k]*sc-ox,a[k+1]*sc-oy);x.closePath()}}
+   x.fill();x.stroke()}}
+});
+function buildGroups(){const mp=new Map();
+ for(const i of vis){const [c,z]=styleOf(R[i]);const k=c+z;let g=mp.get(k);if(!g){g={c,z,idx:[]};mp.set(k,g)}g.idx.push(i)}
+ groups=[...mp.values()].sort((a,b)=>a.z-b.z)}
+function hit(latlng){const px=mx(latlng.lng),py=my(latlng.lat),sc=256*Math.pow(2,map.getZoom()),tol=(weight/2+4)/sc;let best=null,bd=1e9;
+ for(const i of vis){const b=G[i].bb;if(px<b[0]-tol||px>b[2]+tol||py<b[1]-tol||py>b[3]+tol)continue;
+  let d=1e9;for(const a of G[i].rings){let inside=false;
+   for(let k=0,j=a.length-2;k<a.length;j=k,k+=2){const xi=a[k],yi=a[k+1],xj=a[j],yj=a[j+1];
+    if(((yi>py)!=(yj>py))&&(px<(xj-xi)*(py-yi)/(yj-yi)+xi))inside=!inside;
+    const dx=xj-xi,dy=yj-yi,l=dx*dx+dy*dy,t=l?Math.max(0,Math.min(1,((px-xi)*dx+(py-yi)*dy)/l)):0,ex=xi+t*dx-px,ey=yi+t*dy-py;
+    const dd=Math.sqrt(ex*ex+ey*ey);if(dd<d)d=dd}
+   if(inside)d=0}
+  if(d<=tol&&d<bd){bd=d;best=i}}
+ return best}
+function popupHtml(r){const e=r[4]<0?"s/d":D.estados[r[4]],k=prio(r[1]);
+ return '<div class="pop"><h4>CIV '+r[0]+'</h4><div><span>Prioridad</span><b><i class="badge" style="background:'+PRIO[k][1]+(k==2?";color:#14202f":"")+'">'+PRIO[k][0]+'</i> '+r[1]+'</b></div><div><span>Estado actual</span><b>'+e+' (INDEST '+r[3]+')</b></div><div><span>Riesgo de empeorar</span><b>'+Math.round(r[2]*100)+' %</b></div><div><span>Tipo de vía</span><b>'+D.tipos[r[5]]+'</b></div><div><span>Barrio</span><b>'+(r[9]>=0?D.barrios[r[9]].n:"—")+'</b></div><div><span>Localidad</span><b>'+(D.locs[r[6]]||"—")+'</b></div><div><span>Área</span><b>'+nf(r[7])+' m²</b></div></div>'}
+function tryHit(e,fallback){if(cur.bar==null&&map.getZoom()<15){fallback();return}const i=hit(e.latlng);
+ if(i!==null)L.popup({offset:[0,-2]}).setLatLng(e.latlng).setContent(popupHtml(R[i])).openOn(map);else fallback()}
+function drawBarrios(){barG.clearLayers();if(cur.loc==null||!$("blim").checked)return;
+ D.barrios.forEach((b,i)=>{if(b.l!=cur.loc)return;
+  const p=L.polygon(ll(b.r),{renderer:cvLoc,color:"#14202f",weight:1,opacity:.55,dashArray:"4 3",fill:true,fillOpacity:0,bubblingMouseEvents:false});
+  p.bindTooltip(b.n,{sticky:true});p.on("click",e=>tryHit(e,()=>setSel(cur.loc,i)));p.addTo(barG)})}
+function fitSel(){let rs=null;
+ if(cur.bar!=null)rs=D.barrios[cur.bar].r;else if(cur.loc!=null)rs=(D.localidades.find(x=>x.c==cur.loc)||{}).r;
+ if(rs&&rs.length)map.fitBounds(bnds(rs).pad(.04))}
+function setSel(loc,bar,fit=true){
+ cur.loc=loc;cur.bar=bar;
+ scope=[];for(let i=0;i<R.length;i++){const r=R[i];if(loc==null||(r[6]==loc&&(bar==null||r[9]==bar)))scope.push(i)}
+ Object.entries(locLayers).forEach(([c,p])=>p.setStyle({fillOpacity:(loc!=null&&+c==loc)?0:.10,weight:(loc!=null&&+c==loc)?2.8:1.4}));
+ const cnt={};for(const r of R){if(loc!=null&&r[6]==loc&&r[9]>=0)cnt[r[9]]=(cnt[r[9]]||0)+1}
+ const bl=loc==null?[]:D.barrios.map((b,i)=>[b,i]).filter(x=>x[0].l==loc&&cnt[x[1]]);
+ const sb=$("bar");sb.innerHTML='<option value="">Toda la localidad</option>'+bl.sort((a,b)=>a[0].n.localeCompare(b[0].n,"es")).map(([b,i])=>'<option value="'+i+'">'+b.n+' ('+nf(cnt[i])+')</option>').join("");
+ sb.disabled=loc==null;sb.value=bar==null?"":bar;$("loc").value=loc==null?"":loc;
+ hlG.clearLayers();drawBarrios();
+ if(fit){if(loc==null)map.setView(CENTRO,11);else fitSel()}
+ refresh()}
+function refresh(){
+ vis=scope.filter(i=>pass(R[i]));buildGroups();segs.draw();
+ const cnt=[0,0,0,0];let rs=0,ss=0;
+ vis.forEach(i=>{const r=R[i];cnt[prio(r[1])]++;rs+=r[2];ss+=r[1]});const n=vis.length;
+ const cAll=[0,0,0,0];scope.forEach(i=>cAll[prio(R[i][1])]++);
+ PRIO.forEach((p,i)=>$("n"+i).textContent=nf(cAll[i]));
+ $("stats").innerHTML='<div class="kpi"><b>'+nf(n)+'</b><span>tramos visibles</span></div><div class="kpi"><b style="color:#d7263d">'+nf(cnt[0])+'</b><span>urgentes</span></div><div class="kpi"><b>'+(n?(ss/n).toFixed(1):"—")+'</b><span>puntaje medio</span></div><div class="kpi"><b>'+(n?Math.round(100*rs/n):"—")+' %</b><span>riesgo medio de empeorar</span></div>';
+ legend();
+ const top=vis.map(i=>R[i]).sort((a,b)=>b[1]-a[1]).slice(0,10);
+ $("toplist").innerHTML=top.length?top.map((r,i)=>'<div class="top" data-c="'+r[0]+'"><span class="rk">'+(i+1)+'</span><span class="sw" style="background:'+PRIO[prio(r[1])][1]+'"></span>CIV '+r[0]+'<b>'+r[1]+'</b></div>').join(""):'<span class="foot">Sin tramos con estos filtros (o aún cargando).</span>';
+ document.querySelectorAll(".top").forEach(el=>el.onclick=()=>goto(el.dataset.c));
+ const m=$("msg");if(!n&&ready){m.style.display="block";m.textContent="No hay tramos con estos filtros en esta selección."}else m.style.display="none"}
+function legend(){const m=modo();let it=[];
+ if(m=="prio")it=PRIO;if(m=="estado")it=D.estados.map((e,i)=>[e,EST_COL[i]]);
+ if(m=="riesgo")it=RIE;if(m=="tipo")it=D.tipos.map((t,i)=>[t,TIPO_COL[i%TIPO_COL.length]]);
+ $("legend").innerHTML='<div class="sub2">LEYENDA</div>'+it.map(x=>'<div class="chk"><span class="sw" style="background:'+x[1]+'"></span>'+x[0]+'</div>').join("")}
+function llDe(i){return G[i].rings.map(a=>{const r=[];for(let k=0;k<a.length;k+=2)r.push([uy(a[k+1]),ux(a[k])]);return r})}
+function bndsDe(i){const b=G[i].bb;return L.latLngBounds([uy(b[3]),ux(b[0])],[uy(b[1]),ux(b[2])])}
+function goto(civ){const i=byCiv.get(String(civ).trim());if(i===undefined)return false;const r=R[i];
+ if(cur.loc!=r[6]||(cur.bar!=null&&cur.bar!=r[9]))setSel(r[6],null,false);
+ hlG.clearLayers();L.polygon(llDe(i),{pane:"hl",renderer:L.svg({pane:"hl"}),color:"#000",weight:4,fill:false,interactive:false}).addTo(hlG);
+ const b=bndsDe(i);map.fitBounds(b.pad(2),{maxZoom:18});
+ L.popup().setLatLng(b.getCenter()).setContent(popupHtml(r)).openOn(map);return true}
+function aplicarBase(){const v=document.querySelector("[name=bm]:checked").value,o=1-(+$("op").value)/100;
+ Object.entries(base).forEach(([k,l])=>{if(k==v){if(!map.hasLayer(l))map.addLayer(l);l.setOpacity(o)}else if(map.hasLayer(l))map.removeLayer(l)});
+ $("op").disabled=v=="none"}
+// ---- arranque: metadatos, mapa y descarga progresiva por localidad ----
+let pend=null;function programar(){if(pend)return;pend=setTimeout(()=>{pend=null;setSel(cur.loc,cur.bar,false)},250)}
+async function cargarDatos(){
+ const inicial=qs.get("loc")?+qs.get("loc"):null;
+ const orden=[...D.archivos].sort((a,b)=>(a==inicial?-1:b==inicial?1:a-b));
+ let hechos=0;
+ await Promise.all(orden.map(async loc=>{
+  try{const filas=await (await fetch("data/loc_"+loc+".json")).json();agregarFilas(loc,filas)}catch(e){console.warn("falló loc",loc,e)}
+  hechos++;$("bar-i").style.width=(100*hechos/orden.length)+"%";$("estado-carga").textContent="Cargando tramos… "+hechos+" de "+orden.length+" localidades";
+  programar()}));
+ ready=true;$("estado-carga").textContent=nf(R.length)+" tramos cargados";$("bar-carga").style.display="none";setSel(cur.loc,cur.bar,false)}
+function iniciarMapa(){
+ map=L.map("map",{zoomAnimation:false,markerZoomAnimation:false,zoomSnap:.25,preferCanvas:true}).setView(CENTRO,11);
+ base={osm:L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap contributors"}).addTo(map),
+  esri:L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,attribution:"Esri World Imagery"})};
+ map.createPane("segs").style.zIndex=450;map.getPane("segs").classList.add("leaflet-segs-pane");map.createPane("hl").style.zIndex=460;
+ locG=L.layerGroup().addTo(map);barG=L.layerGroup().addTo(map);hlG=L.layerGroup().addTo(map);cvLoc=L.canvas({padding:.3});
+ segs=new Segs().addTo(map);
+ D.localidades.forEach(l=>{const p=L.polygon(ll(l.r),{renderer:cvLoc,color:"#14202f",weight:1.4,opacity:.7,fillColor:"#f5b800",fillOpacity:.10,bubblingMouseEvents:false}).addTo(locG);
+  p.bindTooltip(l.n,{sticky:true});locLayers[l.c]=p;p.on("click",e=>tryHit(e,()=>setSel(l.c,null)))});
+ map.on("click",e=>tryHit(e,()=>{}))}
+function iniciarUI(){
+ Object.entries(D.locs).forEach(([k,v])=>$("loc").insertAdjacentHTML("beforeend",'<option value="'+k+'">'+v+'</option>'));
+ st.est=D.estados.map(()=>1);st.tipo=D.tipos.map(()=>1);
+ PRIO.forEach((p,i)=>$("capas").insertAdjacentHTML("beforeend",'<label class="chk"><input type="checkbox" checked data-i="'+i+'"><span class="sw" style="background:'+p[1]+'"></span>'+p[0]+'<span class="cnt" id="n'+i+'"></span></label>'));
+ D.estados.forEach((e,i)=>$("fest").insertAdjacentHTML("beforeend",'<label class="chk"><input type="checkbox" checked data-e="'+i+'"><span class="sw" style="background:'+EST_COL[i]+'"></span>'+e+'</label>'));
+ D.tipos.forEach((t,i)=>$("ftipo").insertAdjacentHTML("beforeend",'<label class="chk"><input type="checkbox" checked data-t="'+i+'"><span class="sw" style="background:'+TIPO_COL[i%TIPO_COL.length]+'"></span>'+t+'</label>'));
+ document.querySelectorAll("[data-i]").forEach(c=>c.onchange=()=>{st.capas[+c.dataset.i]=c.checked?1:0;refresh()});
+ document.querySelectorAll("[data-e]").forEach(c=>c.onchange=()=>{st.est[+c.dataset.e]=c.checked?1:0;refresh()});
+ document.querySelectorAll("[data-t]").forEach(c=>c.onchange=()=>{st.tipo[+c.dataset.t]=c.checked?1:0;refresh()});
+ $("modo").onchange=refresh;
+ $("loc").onchange=e=>setSel(e.target.value===""?null:+e.target.value,null);
+ $("bar").onchange=e=>setSel(cur.loc,e.target.value===""?null:+e.target.value);
+ $("min").oninput=e=>$("minv").textContent=e.target.value;$("min").onchange=refresh;
+ $("rie").oninput=e=>$("riev").textContent=e.target.value+" %";$("rie").onchange=refresh;
+ $("w").oninput=e=>{weight=+e.target.value;$("wv").textContent=weight+" px";segs.draw()};
+ document.querySelectorAll("[name=bm]").forEach(r=>r.onchange=aplicarBase);
+ $("op").oninput=e=>{$("opv").textContent=e.target.value+" %";aplicarBase()};
+ $("blim").onchange=drawBarrios;
+ $("civ").onkeydown=e=>{e.target.style.borderColor="";if(e.key=="Enter"&&!goto(e.target.value))e.target.style.borderColor="#d7263d"};
+ $("reset").onclick=()=>setSel(null,null,true)}
+(async()=>{
+ try{D=await (await fetch("data/meta.json")).json()}catch(e){$("estado-carga").textContent="No se pudieron cargar los datos.";return}
+ iniciarMapa();iniciarUI();
+ const ini=qs.get("loc")?+qs.get("loc"):null;
+ setSel(ini,null,ini!=null);
+ cargarDatos()})();
+</script></body></html>
