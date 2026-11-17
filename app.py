@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import urllib.request
 from pathlib import Path
 
 import altair as alt
@@ -453,6 +455,19 @@ for i, (_, row) in enumerate(top3.iterrows()):
         )
 
 # ───────────────────────── geovisor ─────────────────────────
+GEOVISOR_URL = os.environ.get("GEOVISOR_URL", "https://geovisor-malla-vial-bogota.vercel.app").rstrip("/")
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _geovisor_web_disponible(url: str) -> bool:
+    """El geovisor ligero (sitio estático en Vercel) responde."""
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url + "/data/meta.json", method="HEAD"), timeout=4) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
 @st.cache_data(show_spinner="Preparando el mapa de toda la ciudad…")
 def _html_geovisor(fuente: str, version: float, _scored: pd.DataFrame) -> str:
     return render_html(construir_datos(_scored, embedded=False))
@@ -461,11 +476,18 @@ def _html_geovisor(fuente: str, version: float, _scored: pd.DataFrame) -> str:
 st.markdown("### Geovisor de tramos")
 st.caption("Mapa de toda la ciudad. Toca una localidad (o elígela en el panel del mapa) y luego un barrio: el mapa se reencuadra. "
            "Puedes cambiar el mapa base, su transparencia y el grosor de los tramos.")
-if not hay_geo:
+web_ok = _geovisor_web_disponible(GEOVISOR_URL) and uploaded is None
+inicial = {v: k for k, v in LOCALIDADES.items()}.get(loc_sel)
+if web_ok:
+    # Versión ligera: sitio estático (datos comprimidos por localidad, carga progresiva).
+    src = f"{GEOVISOR_URL}/?embed=1" + (f"&loc={inicial}" if inicial else "")
+    components.iframe(src, height=760)
+    st.caption(f"[Abrir el geovisor en pantalla completa]({GEOVISOR_URL}/)")
+elif not hay_geo:
     st.info("Falta la geometría de los tramos. Ejecuta `python -m src.geo_prep` (requiere internet) y recarga.")
 else:
+    st.caption("Mostrando la versión integrada (más pesada)." + (" Con un CSV propio se usa siempre esta versión." if uploaded is not None else ""))
     html = _html_geovisor(fuente, PLANTILLA.stat().st_mtime, scored)
-    inicial = {v: k for k, v in LOCALIDADES.items()}.get(loc_sel)
     if inicial is not None:
         html = html.replace('"sel":{"loc":null,"barrio":null}', '"sel":{"loc":%d,"barrio":null}' % inicial, 1)
     components.html(html, height=760, scrolling=False)
